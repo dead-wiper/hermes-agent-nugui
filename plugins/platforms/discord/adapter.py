@@ -1433,8 +1433,30 @@ class DiscordAdapter(DiscordMediaMixin, BasePlatformAdapter):
             return ("discord_intents_required", guidance, False)
         return ("discord_connect_error", f"Discord startup failed: {error}", True)
 
+    @staticmethod
+    def _is_thread_starter_event(message: Any) -> bool:
+        """Return whether a Discord ``MESSAGE_CREATE`` is the synthetic starter event
+        emitted for a newly created thread.
+
+        Discord can deliver the starter with ``type=default``. The stable transport
+        invariant is that the starter message ID equals the thread channel ID, so this
+        guard must run before normal message deduplication or model dispatch.
+        """
+        channel = getattr(message, "channel", None)
+        if not isinstance(channel, getattr(discord, "Thread", ())):
+            return False
+        message_id = getattr(message, "id", None)
+        channel_id = getattr(channel, "id", None)
+        return message_id is not None and channel_id is not None and str(message_id) == str(channel_id)
+
     def _discord_message_admission(self, message: Any, *, claim: bool) -> tuple[bool, bool]:
         """Return ``(admitted, role_authorized)`` for one Discord event."""
+        if self._is_thread_starter_event(message):
+            logger.debug(
+                "[%s] Dropping Discord thread-starter event %s before agent dispatch",
+                self.name, getattr(message, "id", "?"),
+            )
+            return False, False
         message_id = str(getattr(message, "id", ""))
         if claim:
             if self._dedup.is_duplicate(message_id):

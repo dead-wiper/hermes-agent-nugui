@@ -204,6 +204,39 @@ class TestThreadStarterDedup:
         )
 
 
+class TestThreadStarterEventGuard:
+    """The core ingress guard drops a thread-starter MESSAGE_CREATE even when
+    the thread was created by an explicit tool call rather than auto-threading."""
+
+    @pytest.mark.asyncio
+    async def test_thread_starter_message_is_not_admitted(self, adapter, monkeypatch):
+        monkeypatch.setenv("DISCORD_REQUIRE_MENTION", "false")
+        channel = _TextChannel(channel_id=100)
+        thread = object.__new__(discord_platform.discord.Thread)
+        thread.id = 55555
+        thread.parent = channel
+        thread.parent_id = channel.id
+        thread.guild = channel.guild
+        starter = _make_message(
+            msg_id=thread.id,
+            channel=thread,
+            content="元投稿 スレ",
+        )
+
+        admitted, _role_authorized = adapter._discord_message_admission(starter, claim=True)
+
+        assert admitted is False
+        assert adapter._dedup.contains(str(thread.id)) is False
+
+    @pytest.mark.asyncio
+    async def test_first_real_thread_reply_is_not_treated_as_starter(self, adapter):
+        thread = object.__new__(discord_platform.discord.Thread)
+        thread.id = 55555
+        reply = _make_message(msg_id=55556, channel=thread, content="通常の返信")
+
+        assert adapter._is_thread_starter_event(reply) is False
+
+
     @pytest.mark.asyncio
     async def test_no_dedup_seed_when_thread_creation_fails(self, adapter, monkeypatch):
         """When _auto_create_thread returns None, no pre-seeding occurs.
