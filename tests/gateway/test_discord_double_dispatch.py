@@ -176,7 +176,7 @@ class TestThreadStarterDedup:
         monkeypatch.setattr(adapter._threads, "mark_async", fake_mark_async)
 
         # 1) Original user message arrives → triggers thread creation + dispatch
-        user_msg = _make_message(msg_id=42, channel=channel, content="hello bot")
+        user_msg = _make_message(msg_id=42, channel=channel, content="hello bot スレ")
         await adapter._handle_message(user_msg)
 
         # One dispatch for the user message
@@ -261,7 +261,7 @@ class TestThreadStarterEventGuard:
             adapter, "_auto_create_thread", fake_auto_create_thread_fail
         )
 
-        user_msg = _make_message(msg_id=42, channel=channel, content="hello")
+        user_msg = _make_message(msg_id=42, channel=channel, content="hello スレ")
         await adapter._handle_message(user_msg)
 
         # Fail-closed: the agent must NOT run when the required thread route

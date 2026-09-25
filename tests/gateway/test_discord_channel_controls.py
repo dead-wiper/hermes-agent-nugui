@@ -132,7 +132,7 @@ async def test_non_ignored_channel_processes_normally(adapter, monkeypatch):
     # (#20243), which would otherwise mask the assertion below.
     adapter._auto_create_thread = AsyncMock(return_value=FakeThread(channel_id=999))
 
-    message = make_message(channel=FakeTextChannel(channel_id=700), content="hello")
+    message = make_message(channel=FakeTextChannel(channel_id=700), content="hello スレ")
     await adapter._handle_message(message)
 
     adapter.handle_message.assert_awaited_once()
@@ -150,7 +150,7 @@ async def test_ignored_channels_empty_string_ignores_nothing(adapter, monkeypatc
     # (#20243), which would otherwise mask the assertion below.
     adapter._auto_create_thread = AsyncMock(return_value=FakeThread(channel_id=999))
 
-    message = make_message(channel=FakeTextChannel(channel_id=500), content="hello")
+    message = make_message(channel=FakeTextChannel(channel_id=500), content="hello スレ")
     await adapter._handle_message(message)
 
     adapter.handle_message.assert_awaited_once()
@@ -179,6 +179,80 @@ async def test_no_thread_channel_skips_auto_thread(adapter, monkeypatch):
     assert event.source.chat_type == "group"
 
 
+@pytest.mark.asyncio
+async def test_auto_thread_requires_explicit_thread_suffix(adapter, monkeypatch):
+    """Ordinary top-level messages must not auto-create a thread."""
+    monkeypatch.setenv("DISCORD_REQUIRE_MENTION", "false")
+    monkeypatch.setenv("DISCORD_AUTO_THREAD", "true")
+    monkeypatch.delenv("DISCORD_NO_THREAD_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_IGNORED_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_FREE_RESPONSE_CHANNELS", raising=False)
+
+    adapter._auto_create_thread = AsyncMock(return_value=FakeThread(channel_id=999))
+
+    message = make_message(channel=FakeTextChannel(channel_id=900), content="hello")
+    await adapter._handle_message(message)
+
+    adapter._auto_create_thread.assert_not_awaited()
+    adapter.handle_message.assert_awaited_once()
+    event = adapter.handle_message.await_args.args[0]
+    assert event.source.chat_type == "group"
+
+
+@pytest.mark.asyncio
+async def test_auto_thread_creates_for_explicit_thread_suffix(adapter, monkeypatch):
+    """A top-level message ending in 「スレ」 still auto-creates a thread."""
+    monkeypatch.setenv("DISCORD_REQUIRE_MENTION", "false")
+    monkeypatch.setenv("DISCORD_AUTO_THREAD", "true")
+    monkeypatch.delenv("DISCORD_NO_THREAD_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_IGNORED_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_FREE_RESPONSE_CHANNELS", raising=False)
+
+    adapter._auto_create_thread = AsyncMock(return_value=FakeThread(channel_id=999))
+
+    message = make_message(channel=FakeTextChannel(channel_id=900), content="hello スレ")
+    await adapter._handle_message(message)
+
+    adapter._auto_create_thread.assert_awaited_once()
+    adapter.handle_message.assert_awaited_once()
+    event = adapter.handle_message.await_args.args[0]
+    assert event.source.chat_type == "thread"
+
+
+@pytest.mark.asyncio
+async def test_auto_thread_accepts_trailing_whitespace_after_thread_suffix(adapter, monkeypatch):
+    """Whitespace after the explicit 「スレ」 suffix does not cancel the request."""
+    monkeypatch.setenv("DISCORD_REQUIRE_MENTION", "false")
+    monkeypatch.setenv("DISCORD_AUTO_THREAD", "true")
+    monkeypatch.delenv("DISCORD_NO_THREAD_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_IGNORED_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_FREE_RESPONSE_CHANNELS", raising=False)
+
+    adapter._auto_create_thread = AsyncMock(return_value=FakeThread(channel_id=999))
+
+    message = make_message(channel=FakeTextChannel(channel_id=900), content="hello スレ   ")
+    await adapter._handle_message(message)
+
+    adapter._auto_create_thread.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_auto_thread_rejects_non_matching_thread_suffix(adapter, monkeypatch):
+    """A longer suffix such as 「スレッド」 is not an explicit 「スレ」 request."""
+    monkeypatch.setenv("DISCORD_REQUIRE_MENTION", "false")
+    monkeypatch.setenv("DISCORD_AUTO_THREAD", "true")
+    monkeypatch.delenv("DISCORD_NO_THREAD_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_IGNORED_CHANNELS", raising=False)
+    monkeypatch.delenv("DISCORD_FREE_RESPONSE_CHANNELS", raising=False)
+
+    adapter._auto_create_thread = AsyncMock(return_value=FakeThread(channel_id=999))
+
+    message = make_message(channel=FakeTextChannel(channel_id=900), content="hello スレッド")
+    await adapter._handle_message(message)
+
+    adapter._auto_create_thread.assert_not_awaited()
+
+
 # ── auto-thread failure must not silently fall back to inline (#20243) ──
 
 
@@ -202,7 +276,7 @@ async def test_auto_thread_failure_skips_agent_and_notifies_user(adapter, monkey
 
     channel = FakeTextChannel(channel_id=800)
     channel.send = AsyncMock()
-    message = make_message(channel=channel, content="hello")
+    message = make_message(channel=channel, content="hello スレ")
     await adapter._handle_message(message)
 
     adapter._auto_create_thread.assert_awaited_once()

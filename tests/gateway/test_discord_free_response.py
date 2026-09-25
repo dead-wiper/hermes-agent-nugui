@@ -390,7 +390,7 @@ async def test_discord_free_response_auto_thread_opt_in(adapter, monkeypatch):
 
     message = make_message(
         channel=FakeTextChannel(channel_id=789),
-        content="thread this one please",
+        content="thread this one please スレ",
     )
 
     await adapter._handle_message(message)
@@ -414,7 +414,7 @@ async def test_discord_free_response_channel_specific_auto_thread_opt_in(adapter
 
     message = make_message(
         channel=FakeTextChannel(channel_id=789),
-        content="thread only this channel",
+        content="thread only this channel スレ",
     )
     await adapter._handle_message(message)
 
@@ -441,7 +441,7 @@ async def test_discord_no_thread_channels_wins_over_free_response_auto_thread(ad
     # Baseline: the opt-in alone threads this channel.
     monkeypatch.delenv("DISCORD_NO_THREAD_CHANNELS", raising=False)
     adapter._auto_create_thread = AsyncMock(return_value=FakeThread(channel_id=456, name="t"))
-    first = make_message(channel=FakeTextChannel(channel_id=789), content="threaded by opt-in")
+    first = make_message(channel=FakeTextChannel(channel_id=789), content="threaded by opt-in スレ")
     await adapter._handle_message(first)
     adapter._auto_create_thread.assert_awaited_once_with(first)
 
