@@ -4809,6 +4809,12 @@ class DiscordAdapter(DiscordMediaMixin, BasePlatformAdapter):
         Channels listed in ``auto_thread_title_original_channels`` keep the original post text as
         their permanent thread title.
         """
+        initial_name = getattr(source, "auto_thread_initial_name", None)
+        if isinstance(initial_name, str) and initial_name.rstrip().endswith("スレ"):
+            # An explicit 「スレ」 suffix is a user instruction to create a thread with the
+            # source wording as its title. Do not let the generated session title (which can be
+            # derived from a channel skill heading) overwrite that title.
+            return False
         extra = getattr(self.config, "extra", None)
         selected = extra.get("auto_thread_title_original_channels") if isinstance(extra, dict) else None
         if isinstance(selected, str):

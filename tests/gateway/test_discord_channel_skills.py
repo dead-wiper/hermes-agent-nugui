@@ -1,4 +1,5 @@
 """Tests for Discord channel_skill_bindings auto-skill resolution."""
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 
@@ -32,5 +33,25 @@ class TestResolveChannelSkills:
             ]
         }
         assert adapter._resolve_channel_skills("999") is None
+
+    def test_explicit_thread_request_preserves_original_title(self):
+        adapter = _make_adapter()
+        source = SimpleNamespace(
+            chat_id="thread-1",
+            parent_chat_id="channel-1",
+            auto_thread_initial_name="元投稿の文言 スレ",
+        )
+
+        assert adapter.should_semantic_rename_discord_thread(source) is False
+
+    def test_ordinary_auto_thread_remains_semantically_renamable(self):
+        adapter = _make_adapter()
+        source = SimpleNamespace(
+            chat_id="thread-1",
+            parent_chat_id="channel-1",
+            auto_thread_initial_name="通常の自動スレッド",
+        )
+
+        assert adapter.should_semantic_rename_discord_thread(source) is True
 
 
